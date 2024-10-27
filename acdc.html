@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Animación de Señal AC-DC</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        #playPause {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        #reset {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .graph-container {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .graph-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .graph {
+            background-color: #f9f9f9;
+        }
+
+        .equation {
+            text-align: center;
+            font-style: italic;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .explanation {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e8f5e9;
+            border-radius: 5px;
+        }
+
+        .explanation p {
+            margin: 5px 0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="text-align: center;">Transformación de Señal AC a DC</h1>
+        
+        <div class="controls">
+            <button id="playPause">Iniciar/Pausa</button>
+            <button id="reset">Reiniciar</button>
+        </div>
+
+        <div class="graph-container">
+            <div class="graph-title">Señal Original (AC)</div>
+            <canvas id="originalSignal" class="graph" width="700" height="200"></canvas>
+            <div class="equation">v(t) = V₀ sin(2πft)</div>
+        </div>
+
+        <div class="graph-container">
+            <div class="graph-title">Señal Rectificada</div>
+            <canvas id="rectifiedSignal" class="graph" width="700" height="200"></canvas>
+            <div class="equation">v_rect(t) = |v(t)|</div>
+        </div>
+
+        <div class="graph-container">
+            <div class="graph-title">Señal Filtrada (DC)</div>
+            <canvas id="filteredSignal" class="graph" width="700" height="200"></canvas>
+            <div class="equation"></div>
+        </div>
+
+        <div class="explanation">
+            <img src="https://lh3.googleusercontent.com/d/103MmV-HJpIRFwFm4XYtfBZOzDaGS2zo9" style="width: 100%;" alt="">
+            <p>1. La señal original es una onda senoidal que oscila entre valores positivos y negativos.</p>
+            <p>2. El puente de diodos rectifica la señal, convirtiendo todos los valores negativos en positivos.</p>
+            <p>3. El condensador actúa como filtro, suavizando la señal rectificada para obtener un voltaje DC más estable, cargandose y descargandose cuando sube y baja la señal.</p>
+        </div>
+    </div>
+
+    <script>
+        class SignalAnimation {
+            constructor() {
+                this.time = 0;
+                this.isPlaying = true;
+                this.animationFrame = null;
+                
+                this.canvases = {
+                    original: document.getElementById('originalSignal'),
+                    rectified: document.getElementById('rectifiedSignal'),
+                    filtered: document.getElementById('filteredSignal')
+                };
+                
+                this.contexts = {
+                    original: this.canvases.original.getContext('2d'),
+                    rectified: this.canvases.rectified.getContext('2d'),
+                    filtered: this.canvases.filtered.getContext('2d')
+                };
+
+                this.setupControls();
+                this.animate();
+            }
+
+            setupControls() {
+                document.getElementById('playPause').addEventListener('click', () => {
+                    this.isPlaying = !this.isPlaying;
+                    if (this.isPlaying) this.animate();
+                });
+
+                document.getElementById('reset').addEventListener('click', () => {
+                    this.time = 0;
+                });
+            }
+
+            drawSignal(context, type) {
+                const canvas = context.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                // Limpiar el canvas
+                context.clearRect(0, 0, width, height);
+                
+                // Dibujar línea central
+                context.beginPath();
+                context.strokeStyle = '#ccc';
+                context.setLineDash([5, 5]);
+                context.moveTo(0, height/2);
+                context.lineTo(width, height/2);
+                context.stroke();
+                context.setLineDash([]);
+
+                // Dibujar la señal
+                context.beginPath();
+                context.strokeStyle = type === 'original' ? '#2196F3' : 
+                                    type === 'rectified' ? '#4CAF50' : '#f44336';
+                context.lineWidth = 2;
+
+                for (let x = 0; x <= width; x++) {
+                    const t = (x / width) * 4 + this.time;
+                    let y = 0;
+
+                    switch(type) {
+                        case 'original':
+                            y = Math.sin(t * Math.PI);
+                            break;
+                        case 'rectified':
+                            y = Math.abs(Math.sin(t * Math.PI));
+                            break;
+                        case 'filtered':
+                            const raw = Math.abs(Math.sin(t * Math.PI));
+                            y = raw * 0.3 + 0.7;
+                            break;
+                    }
+
+                    y = height/2 - y * (height/3);
+                    
+                    if (x === 0) {
+                        context.moveTo(x, y);
+                    } else {
+                        context.lineTo(x, y);
+                    }
+                }
+                context.stroke();
+            }
+
+            animate() {
+                if (!this.isPlaying) return;
+
+                this.time += 0.02;
+                
+                this.drawSignal(this.contexts.original, 'original');
+                this.drawSignal(this.contexts.rectified, 'rectified');
+                this.drawSignal(this.contexts.filtered, 'filtered');
+
+                this.animationFrame = requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        // Iniciar la animación cuando se carga la página
+        window.onload = () => new SignalAnimation();
+    </script>
+</body>
+</html>
